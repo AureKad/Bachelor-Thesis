@@ -101,12 +101,12 @@ remove dref eref = do
     p <- return (prev elem) 
     n <- return (next elem) 
     case dllHead dll of 
-        Nothing -> fail "This doubly linked list does not contain the elem"
+        Nothing -> error "This doubly linked list does not contain the elem"
         Just ref 
             | ref==eref -> modifySTRef dref (\d -> d {dllHead = n})
             | otherwise -> return () 
     case dllTail dll of 
-        Nothing -> fail "This doubly linked list does not contain the elem"
+        Nothing -> error "This doubly linked list does not contain the elem"
         Just ref 
             | ref==eref -> modifySTRef dref (\d -> d {dllTail = p})
             | otherwise -> return () 

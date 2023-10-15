@@ -1,10 +1,11 @@
 import Dlx
 import Queens
+import Sudoku 
 import Data.List.Split
 import Data.List
 
 -- Board exact cover problem 
-data BoardECP = Board {
+data Board = Board {
     possibleInputs :: [String],
     numberOfInputs :: Int,
     boardState :: [[String]],

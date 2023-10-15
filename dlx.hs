@@ -6,6 +6,7 @@ import Control.Monad.ST
 import Data.List
 import Debug.Trace
 import Queens 
+import Sudoku
 
 
 
@@ -34,6 +35,10 @@ testdlx = dlx (["a","b","c","d","e","f","g"],[]) [["c","e"],["a","d","g"],["b","
 testdlx1 = dlx (["a","b"],["c"]) [["a","b","c"], ["a","b"]]
 
 testQueens i = let (items, options) = queens i in 
+    putStr (displaySolutions (dlx items options))
+    
+-- https://sandiway.arizona.edu/sudoku/examples.html
+testSudoku = let (items, options) = sudoku ["...26.7.1","68..7..9.","19...45","82.1...4","..46.29",".5...3.28","..93...74",".4..5..36","7.3.18"] in 
     putStr (displaySolutions (dlx items options))
 
 displaySolutions :: [[[String]]] -> String 
