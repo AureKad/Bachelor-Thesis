@@ -1,17 +1,48 @@
-module Sudoku (sudoku) where 
+module Sudoku (sudoku, interpretSudoku) where 
 import Data.Array.ST
 import Control.Monad.ST
 import Data.Array.Base
 import Data.Char 
-
+sudoku :: [String] -> (([String], [a]), [[String]])
 sudoku board = let filled = fill board in 
     let (pos, row, col, box) = check (create9x9,create9x9,create9x9,create9x9) filled 0 in 
-        let primary = items (pos, row, col, box) in  
-            let options =  getOptions (pos, row, col, box) 0 in 
-                ((primary,[]), options)
+    let primary = items (pos, row, col, box) in  
+    let options =  getOptions (pos, row, col, box) 0 in 
+        ((primary,[]), options)
 
+interpretSudoku :: [String] -> [[[String]]] -> String
+interpretSudoku board res = 
+    let bracketedRes = map bracketRows res in 
+    let brd = transform board in 
+        foldr (\x r -> printSudoku x ++ r) "" (map (help brd) bracketedRes) where
 
-fill :: [[Char]] -> [[Char]]
+            printSudoku = foldr (\x r -> concat(map (\c -> c : " ") x) ++ "\n" ++ r) "\n"   
+
+            help brd rows = let rws = map (\x -> ["p_/","___"]:x) rows in
+                let res = map slotIn (zip brd rws) in 
+                    map (\xs -> case xs of x:ys -> ys) res --removes the underscore
+
+            slotIn (brd,[x]) = (x!!1)!!2: brd 
+            slotIn (brd,x1:x2:xs) = 
+                let diff = charToInt ((x2!!0)!!2) - charToInt ((x1!!0)!!2) in 
+                let (b1, rest) = splitAt (diff-1) brd in 
+                   ((x1!!1)!!2 : b1) ++ slotIn (rest, x2:xs)
+
+            charToInt i = ord i 
+
+            transform = map (\xs -> [x | x <- xs, isDigit x && x /= '0']) 
+
+            bracketRows xss = 
+                let xs = bracketRowsHelper xss in 
+                let (res, _) = splitAt (length xss - length xs) xss in 
+                    if xs == [] then [res] else res:bracketRows xs  
+
+            bracketRowsHelper [x] = []
+            bracketRowsHelper (x1:x2:xs) = if (x1!!0)!!1 == (x2!!0)!!1 then bracketRowsHelper (x2:xs) else x2:xs
+        
+
+     
+fill :: [String] -> [String]
 fill board = if length board /= 9 then error "The board length is not 9" else 
     fill_rows board where 
         fill_rows board = map frow board 
@@ -28,10 +59,10 @@ check (pos,row,col,box) board j = check (innerLoop (pos,row,col,box) board j 0) 
     innerLoop (pos,row,col,box) _ j 9 = (pos,row,col,box)
     innerLoop (pos,row,col,box) board j k = 
         if not (isDigit ((board!!j)!!k) && (board!!j)!!k /= '0') then innerLoop (pos,row,col,box) board j (k+1) else 
-            let (d,x) = (digitToInt ((board!!j)!!k), boxx j k) in  
+            let (d,x) = (digitToInt ((board!!j)!!k) - 1, boxx j k) in  
                 -- position update, checks row for duplicates, checks columns, checks box
-                innerLoop (update pos j k d, checkArr row j k (d-1) "columns" "row", 
-                            checkArr col k j (d-1) "rows" "column", checkArr box x j (d-1) "rows" "box") board j (k+1) 
+                innerLoop (update pos j k (d+1), checkArr row j k d "columns" "row", 
+                            checkArr col k j d "rows" "column", checkArr box x j d "rows" "box") board j (k+1) 
 
     checkArr arr j k d errMsg1 errMsg2 = if (arr!!j)!!d /= 0 then 
         error ("digit " ++ show (d+1) ++ " appears in " ++ errMsg1 ++ " " ++ show ((arr!!j)!!d - 1) ++ 
@@ -54,7 +85,7 @@ getOptions (pos, row, col, box) j = middleLoop (pos, row, col, box) j 0 ++ getOp
     middleLoop (pos, row, col, box) j k = innerLoop (pos, row, col, box) j k 0 ++ middleLoop (pos, row, col, box) j (k+1) where 
         innerLoop (pos, row, col, box) j k 9 = [] 
         innerLoop (pos, row, col, box) j k d = let x = boxx j k in  
-            if not (((pos!!j)!!k == 0) && ((row!!j)!!d == 0) && ((col!!k)!!d == 0) && ((box!!(x))!!d == 0))
+            if  not (((pos!!j)!!k == 0) && ((row!!j)!!d == 0) && ((col!!k)!!d == 0) && ((box!!(x))!!d == 0))
                 then innerLoop (pos, row, col, box) j k (d+1) else 
                     [("p" ++ show j ++ show k), ("r" ++ show j ++ show (d+1)), ("c" ++ show k ++ show (d+1)), 
                     ("b" ++ show x ++ show (d+1))]: innerLoop (pos, row, col, box) j k (d+1)

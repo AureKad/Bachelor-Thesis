@@ -2,6 +2,7 @@ module DllArray where
 import Data.Array.ST
 import Control.Monad.ST
 import Data.Array.Base
+import Debug.Trace
 
 data Item a = Item {
     value :: a,
@@ -40,9 +41,24 @@ nodeArray matrix itemsArr = do
     nodeAssocs <- getAssocs nodes  
     updateSpacerRefs nodes nodeAssocs
     updateNodeRefs nodes nodeAssocs
+    modifyArray nodes 0 (\n -> n {itm = -1})
+    b <- getNumElements nodes
+    fixItemsNodes nodes
     return nodes where 
+
+        fixItemsNodes nodes = do
+            assc <- getAssocs nodes
+            let r = filter (\(i,n) -> itm n == 0) assc
+            fix nodes r where
+                fix nodes [] = return () 
+                fix nodes ((i, x):xs) = do 
+                    modifyArray nodes i (\n -> n {up = i, down = i})
+                    fix nodes xs
+
+
         createItemNodes :: [(Int, Item a)] -> [Node]
         createItemNodes = map (\x -> Node {up = 0, itm = 0, down = 0}) --creating extra nodes for all the items
+
 
         --creating nodes, but without the references 
         createNodes :: Eq a => [[a]] -> [(Int, Item a)]  -> [Node]

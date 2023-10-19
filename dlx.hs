@@ -1,4 +1,4 @@
-module Dlx (dlx) where
+module Dlx (dlx, displaySolutions) where
 import DllArray 
 import Data.Array
 import Data.Array.ST
@@ -30,16 +30,32 @@ test2 = runSTArray (do
 
 test3 = test == test2
 
+
 testdlx = dlx (["a","b","c","d","e","f","g"],[]) [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]]
 
 testdlx1 = dlx (["a","b"],["c"]) [["a","b","c"], ["a","b"]]
+
+testdlx2 = dlx (["a","b"],["c"]) [["a"],["c"]]
+
+testdlx3 = dlx (["a","b"],["c"]) []
+
+testdlx4 = dlx (["1", "2", "3","4", "5", "6", "7"],[]) [["1","4"], ["1", "4", "7"], ["2","7"], ["3","5","6"], ["4","5","7"],["2","3","6","7"]]
 
 testQueens i = let (items, options) = queens i in 
     putStr (displaySolutions (dlx items options))
     
 -- https://sandiway.arizona.edu/sudoku/examples.html
-testSudoku = let (items, options) = sudoku ["...26.7.1","68..7..9.","19...45","82.1...4","..46.29",".5...3.28","..93...74",".4..5..36","7.3.18"] in 
-    putStr (displaySolutions (dlx items options))
+testSudoku = let board = ["...26.7.1","68..7..9.","19...45","82.1...4","..46.29",".5...3.28","..93...74",".4..5..36","7.3.18"] in
+    let (items, options) = sudoku board in 
+       putStr (interpretSudoku board (dlx items options))
+
+testSudoku2 = let board = [".2","...6....3",".74.8",".....3..2",",8..4..1","6..5","....1.78","5....9",".......4"] in -- real hard 
+    let (items, options) = sudoku board in 
+       putStr (interpretSudoku board (dlx items options))
+
+testSudoku3 = let board = ["9.6.7.4.3","...4..2",".7..23.1","5.....1",".4.2.8.6","..3.....5",".3.7...5","..7..5","4.5.1.7.8"] in --multiple solutions
+    let (items, options) = sudoku board in 
+       putStr (interpretSudoku board (dlx items options))
 
 displaySolutions :: [[[String]]] -> String 
 displaySolutions = foldr (\xss n -> displaySolution xss ++ n) "" where 
@@ -53,7 +69,7 @@ dlx items options = runST (dlxInit items options) where
         items <- itemArray (primary++secondary)
         nodes <- nodeArray options items
         bt <- newArray (0, length options) 0 --backtrack Array
-        let n = length primary --delimiter between primary and secondary items
+        let n = length primary  --delimiter between primary and secondary items
         let l = 0
         r <- getNext items l
         solutionIndices <- dlxLoop items nodes bt l n
@@ -70,7 +86,7 @@ dlx items options = runST (dlxInit items options) where
                     --X4  
                     cover items nodes i
                     x <- getDown nodes i 
-                    modifyArray bt l (\_ -> x)
+                    modifyArray bt l (\_ -> x) 
                     --X5
                     try items nodes bt l i n
                 
@@ -88,10 +104,10 @@ dlx items options = runST (dlxInit items options) where
         o <- getItm nodes p 
         helper items nodes o p p n where 
             helper items nodes o p i n = do
-                if p >= n then return i else do 
+                if p == 0 || p >= n then return i else do 
                     lambda <- getItm nodes p
                     p' <- getNext items p
-                    if lambda >= o then helper items nodes o p' i n else do 
+                    if lambda >= o && p /= 0 then helper items nodes o p' i n else do 
                         helper items nodes lambda p' p n
 
     --X5
@@ -139,9 +155,9 @@ dlx items options = runST (dlxInit items options) where
             retry items nodes bt (l-1) n
 
 cover :: STArray s Int (Item a) -> STArray s Int Node -> Int -> ST s ()
-cover items nodes i = do  
+cover items nodes i = do 
     p <- getDown nodes i 
-    whileLoop (\p -> p /= i) hide p nodes 
+    whileLoop (\p -> p /= i) hide p nodes
     l <- getPrev items i 
     r <- getNext items i 
     modifyArray items l (\n -> n {next = r})
@@ -163,7 +179,7 @@ cover items nodes i = do
                     x <- getItm nodes q 
                     u <- getUp nodes q
                     d <- getDown nodes q 
-                    if x == -1 then whileLoop cond u nodes else do
+                    if x <= 0 then whileLoop cond u nodes else do
                         modifyArray nodes u (\n -> n {down = d})
                         modifyArray nodes d (\n -> n {up = u})
                         subTopLen nodes x
@@ -194,7 +210,7 @@ uncover items nodes i = do
                     x <- getItm nodes q 
                     u <- getUp nodes q
                     d <- getDown nodes q 
-                    if x == -1 then whileLoop cond d nodes else do
+                    if x <= 0 then whileLoop cond d nodes else do
                         modifyArray nodes u (\n -> n {down = q})
                         modifyArray nodes d (\n -> n {up = q})
                         addTopLen nodes x

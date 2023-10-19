@@ -29,3 +29,15 @@ queens n = ((primary n,secondary (2*n-3)),options (n-1) n)
             let a = if j+k > 0 && (j+k <= 2*n-3) then ["a" ++ encode (j+k)] else [] in 
                 let b = if n-1-j+k >0 && (n-1-j+k <= 2*n-3) then ["b" ++ encode (n-1-j+k)] else [] in 
                     [rc ++ a ++ b] 
+
+interpretQueens :: Int -> [[[String]]] -> String 
+interpretQueens n sols = let interpretedRows = map (map (interpretRow n)) sols in 
+    foldr (\x r -> (foldr (\y l -> y ++ "\n" ++ l) "\n" x) ++ r) "" interpretedRows where 
+
+        interpretRow n row = help n row 0 where 
+            help n row i 
+                | i==n = ""
+                | otherwise = if charToInt ((row!!1)!!1) == i then "Q " ++ help n row (i+1) else 
+                                  "X " ++ help n row (i+1)
+
+        charToInt i = ord i - 48 
