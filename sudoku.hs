@@ -24,11 +24,9 @@ interpretSudoku board res =
 
             slotIn (brd,[x]) = (x!!1)!!2: brd 
             slotIn (brd,x1:x2:xs) = 
-                let diff = charToInt ((x2!!0)!!2) - charToInt ((x1!!0)!!2) in 
+                let diff = ord ((x2!!0)!!2) - ord ((x1!!0)!!2) in 
                 let (b1, rest) = splitAt (diff-1) brd in 
                    ((x1!!1)!!2 : b1) ++ slotIn (rest, x2:xs)
-
-            charToInt i = ord i 
 
             transform = map (\xs -> [x | x <- xs, isDigit x && x /= '0']) 
 

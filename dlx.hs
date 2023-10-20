@@ -9,58 +9,6 @@ import Queens
 import Sudoku
 
 
-
-test = runSTArray (do
-    items <- itemArray ["a","b","c","d","e","f","g"]
-    nodes <- nodeArray [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]] items
-    return nodes) 
-
-test1 = runSTArray (do
-    items <- itemArray ["a","b","c","d","e","f","g"]
-    nodes <- nodeArray [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]] items
-    cover items nodes 2
-    return nodes)
-
-test2 = runSTArray (do
-    items <- itemArray ["a","b","c","d","e","f","g"]
-    nodes <- nodeArray [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]] items
-    cover items nodes 2
-    uncover items nodes 2
-    return nodes)
-
-test3 = test == test2
-
-
-testdlx = dlx (["a","b","c","d","e","f","g"],[]) [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]]
-
-testdlx1 = dlx (["a","b"],["c"]) [["a","b","c"], ["a","b"]]
-
-testdlx2 = dlx (["a","b"],["c"]) [["a"],["c"]]
-
-testdlx3 = dlx (["a","b"],["c"]) []
-
-testdlx4 = dlx (["1", "2", "3","4", "5", "6", "7"],[]) [["1","4"], ["1", "4", "7"], ["2","7"], ["3","5","6"], ["4","5","7"],["2","3","6","7"]]
-
-testQueens i = let (items, options) = queens i in 
-    putStr (displaySolutions (dlx items options))
-    
--- https://sandiway.arizona.edu/sudoku/examples.html
-testSudoku = let board = ["...26.7.1","68..7..9.","19...45","82.1...4","..46.29",".5...3.28","..93...74",".4..5..36","7.3.18"] in
-    let (items, options) = sudoku board in 
-       putStr (interpretSudoku board (dlx items options))
-
-testSudoku2 = let board = [".2","...6....3",".74.8",".....3..2",",8..4..1","6..5","....1.78","5....9",".......4"] in -- real hard 
-    let (items, options) = sudoku board in 
-       putStr (interpretSudoku board (dlx items options))
-
-testSudoku3 = let board = ["9.6.7.4.3","...4..2",".7..23.1","5.....1",".4.2.8.6","..3.....5",".3.7...5","..7..5","4.5.1.7.8"] in --multiple solutions
-    let (items, options) = sudoku board in 
-       putStr (interpretSudoku board (dlx items options))
-
-displaySolutions :: [[[String]]] -> String 
-displaySolutions = foldr (\xss n -> displaySolution xss ++ n) "" where 
-    displaySolution = foldr (\xs n -> concat (map (\x -> x ++ " ") xs) ++ "\n" ++ n) "\n" where 
-
 dlx :: Eq a => ([a],[a]) -> [[a]] -> [[[a]]]
 dlx items options = runST (dlxInit items options) where
     --X1 
@@ -73,7 +21,7 @@ dlx items options = runST (dlxInit items options) where
         let l = 0
         r <- getNext items l
         solutionIndices <- dlxLoop items nodes bt l n
-        printSolutions items nodes (map sort solutionIndices) where
+        interpretSolution items nodes (map sort solutionIndices) where
 
     --X2
     dlxLoop ::  STArray s Int (Item a) -> STArray s Int Node -> STArray s Int Int -> Int -> Int -> ST s [[Int]]
@@ -217,11 +165,11 @@ uncover items nodes i = do
                         whileLoop cond (q-1) nodes 
 
                     
-printSolutions :: STArray s Int (Item a) -> STArray s Int Node -> [[Int]] -> ST s [[[a]]]
-printSolutions items nodes [] = return []
-printSolutions items nodes (is:iss) = do
+interpretSolution :: STArray s Int (Item a) -> STArray s Int Node -> [[Int]] -> ST s [[[a]]]
+interpretSolution items nodes [] = return []
+interpretSolution items nodes (is:iss) = do
     sol <- printSolution items nodes is
-    (sol:) <$> printSolutions items nodes iss where 
+    (sol:) <$> interpretSolution items nodes iss where 
 
     printSolution items nodes [] = return []
     printSolution items nodes (i:is) = do 
@@ -239,3 +187,54 @@ printSolutions items nodes (is:iss) = do
                 if j == -1 then return []
                     else do elem <- getValue items j  
                             (elem:) <$> whileLoop (p+1) items nodes
+
+displaySolutions :: [[[String]]] -> String 
+displaySolutions = foldr (\xss n -> displaySolution xss ++ n) "" where 
+    displaySolution = foldr (\xs n -> concat (map (\x -> x ++ " ") xs) ++ "\n" ++ n) "\n" 
+
+test = runSTArray (do
+    items <- itemArray ["a","b","c","d","e","f","g"]
+    nodes <- nodeArray [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]] items
+    return nodes) 
+
+test1 = runSTArray (do
+    items <- itemArray ["a","b","c","d","e","f","g"]
+    nodes <- nodeArray [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]] items
+    cover items nodes 2
+    return nodes)
+
+test2 = runSTArray (do
+    items <- itemArray ["a","b","c","d","e","f","g"]
+    nodes <- nodeArray [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]] items
+    cover items nodes 2
+    uncover items nodes 2
+    return nodes)
+
+test3 = test == test2
+
+
+testdlx = dlx (["a","b","c","d","e","f","g"],[]) [["c","e"],["a","d","g"],["b","c","f"],["a","d","f"],["b","g"],["d","e","g"]]
+
+testdlx1 = dlx (["a","b"],["c"]) [["a","b","c"], ["a","b"]]
+
+testdlx2 = dlx (["a","b"],["c"]) [["a"],["c"]]
+
+testdlx3 = dlx (["a","b"],["c"]) []
+
+testdlx4 = dlx (["1", "2", "3","4", "5", "6", "7"],[]) [["1","4"], ["1", "4", "7"], ["2","7"], ["3","5","6"], ["4","5","7"],["2","3","6","7"]]
+
+testQueens i = let (items, options) = queens i in 
+    putStr (displaySolutions (dlx items options))
+    
+-- https://sandiway.arizona.edu/sudoku/examples.html
+testSudoku = let board = ["...26.7.1","68..7..9.","19...45","82.1...4","..46.29",".5...3.28","..93...74",".4..5..36","7.3.18"] in
+    let (items, options) = sudoku board in 
+       putStr (interpretSudoku board (dlx items options))
+
+testSudoku2 = let board = [".2","...6....3",".74.8",".....3..2",",8..4..1","6..5","....1.78","5....9",".......4"] in -- real hard 
+    let (items, options) = sudoku board in 
+       putStr (interpretSudoku board (dlx items options))
+
+testSudoku3 = let board = ["9.6.7.4.3","...4..2",".7..23.1","5.....1",".4.2.8.6","..3.....5",".3.7...5","..7..5","4.5.1.7.8"] in --multiple solutions
+    let (items, options) = sudoku board in 
+       putStr (interpretSudoku board (dlx items options))
