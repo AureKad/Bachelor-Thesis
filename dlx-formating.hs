@@ -3,6 +3,7 @@ import Queens
 import Sudoku 
 import Data.Char
 import Data.List
+import Data.List.Split
 {-
 -- Board exact cover problem 
 data Board = Board {
@@ -61,7 +62,7 @@ diagonals = tail . go [] where
 
 
 rowCond :: [[String]] -> Bool
-rowCond board = all (==1) (map (\xs -> sum (map (\x -> if x /= "." then 1 ::Int else 0 ::Int) xs )) board)
+rowCond board = all (==1) (map (\xs -> sum (map (\x -> if x /= "." then 1 else 0) xs )) board)
 
 colCond :: [[String]] -> Bool 
 colCond board = all (==1) (map (\xs -> sum (map (\x -> if x /= "." then 1 else 0) xs)) (transpose board))
@@ -72,65 +73,112 @@ lrDiag board = all (<=1) (map (\xs -> sum (map (\x -> if x /= "." then 1 else 0)
 rlDiag :: [[String]] -> Bool 
 rlDiag board = all (<=1) (map (\xs -> sum (map (\x -> if x /= "." then 1 else 0) xs)) (diagonals (reverse board)))
 
--- Testing if dlxFormat can output the right queens format based on only the conditions 
-dlxFormatTest = let (items, options) = dlxFormat ([rowCond, colCond],[lrDiag, rlDiag]) [["-","-","-","-"],["-","-","-","-"],["-","-","-","-"],["-","-","-","-"]] in
-    dlx items options 
+rowCondSudoku board= let inputs = [show x | x <- [1..9]] in 
+    all (==True) (map (all (==1)) (map (\input -> map (\xs -> sum (map (\x -> if x == input then 1 else 0) xs)) board ) inputs))
 
-test1 = rlDiag [[".","a"],["a","a"]]
+condTest = rowCondSudoku [["1","2","3"], ["1","1","2","2","2","3","4"]]
+condTest2 = rowCondSudoku [[show x | x <- [1..9]], reverse [show x | x <- [1..9]]]
+
+-- Testing if dlxFormat can output the right queens format based on only the conditions 
+dlxFormatTest = let (items, options) = dlxFormat ([rowCond, colCond ],[lrDiag, rlDiag]) [["."| x <- [0..3]] | y <- [0..3]] ["Q"] in
+    options 
+
+dlxFormatTest2 = let (items, options) = dlxFormat ([rowCondSudoku],[]) [["1","2","3",".","5","6","7","8","."]] [show x | x <- [1..9]] in 
+    options
 
 -- get dlx format based on conditions and board 
-dlxFormat (primaryCond, secondaryCond) board = let boardPos = boardPositions board 0 in 
-    let options = nextCond (primaryCond ++ secondaryCond) boardPos boardPos 0 in 
+dlxFormat (primaryCond, secondaryCond) board inputs = let boardPos = boardPositions board 0 in 
+    let options = nextCond (primaryCond ++ secondaryCond) inputs boardPos boardPos 0 board in 
     let (primary, secondary) = findItems options (length primaryCond) in 
         ((concat primary, concat secondary),options) where
-
-        findItems opts i = splitAt i (map nub (transpose (map (drop 1) opts))) where   
-        
-        nextCond [] _ format _ = format 
-        -- searches for next conditions format, combines it with the previous format, and saves it in format for the next function call
-        nextCond (c:cs) allpos format i = nextCond cs allpos (combine format (nextPos c allpos [] [] 0 ([condLetter i]))) (i+1)
-
-        condLetter i = chr (97+i)
-
-        nextPos cond allpos provFormat store i lt = if length allpos == length provFormat then provFormat else 
-            if test cond allpos (provFormat ++ [lt ++ show i]) 
-                then nextPos cond allpos (provFormat ++ [lt ++ show i]) ((lt ++ show i) :store) (i+1) lt
-                else nextPos cond allpos (findOpt cond allpos provFormat store) store i lt
-
-        --Find critical option 
-        findOpt _ _ x [] = error (show x)
-        findOpt cond allpos provFormat (x:xs) = 
-            let prov = map (\y -> if y == x then "." else y) provFormat in -- replaces x in provFormat to test if its the critical option
-                if test cond allpos (prov ++ [x]) 
-                then (provFormat ++ [x]) 
-                else findOpt cond allpos provFormat xs
-
-        test cond allpos provFormat = cond (translate (combine allpos provFormat)) 
-
-        --provisional combine, aka for zipping allBoard with the work-in-progress formatting for condition
-        combine _ [] = []
-        combine (p:ps) (x:xs) = (p ++ [x]): combine ps xs  
-
-        --dlf := dancing links formatting
-        translate :: [[String]] -> [[String]]
-        translate dlf = let transdlf = transform [] dlf in  
-            let bdlf = bracketRows transdlf in 
-                map (map (\x -> x!!1)) bdlf
-            where
-                bracketRows xss = 
-                    let xs = bracketRowsHelper xss in 
-                    let (res, _) = splitAt (length xss - length xs) xss in 
-                        if xs == [] then [res] else res:bracketRows xs  
-
-                bracketRowsHelper [x] = []
-                bracketRowsHelper (x1:x2:xs) = if (x1!!0)!!1 == (x2!!0)!!1 then bracketRowsHelper (x2:xs) else x2:xs
-
-                transform _ [] = []
-                transform store (x:xs) = if elem (x!!1) store || (x!!1) == "." then [x!!0,"."]: transform store xs else 
-                    [x!!0,"Q"]: transform ((x!!1):store) xs
-
+            
         boardPositions [] _ = []
         boardPositions (xs:xss) i = boardCols xs i 0 ++ boardPositions xss (i+1)
             where
                 boardCols [] _ _ = []
                 boardCols (x:xs) i j = ["p" ++ show i ++ show j]: boardCols xs i (j+1)
+
+        findItems opts i = let options = map nub (transpose  opts) in
+            let (pos, rest) = splitAt 1 options in
+            let (pr, sr) = splitAt i rest in 
+                (pr, sr++pos)
+        
+        nextCond [] _ _ format _ _ = format 
+        -- searches for next conditions format, combines it with the previous format, and saves it in format for the next function call
+        nextCond (c:cs) inputs allpos format i board = 
+            nextCond cs inputs allpos (combine format (nextPos c inputs allpos [] [] 0 [condLetter i] board)) (i+1) board
+
+        condLetter i = chr (97+i)
+
+        nextPos cond inputs allpos provFormat store i lt board = if length allpos == length provFormat then provFormat else 
+            let newOptions = testNewInputs cond inputs allpos provFormat i lt board in 
+                if newOptions /= []
+                    then nextPos cond inputs allpos (provFormat ++ newOptions) (newOptions ++ store) (i+1) lt board
+                    else nextPos cond inputs allpos (testOldPos cond allpos provFormat store board) store i lt board  
+
+        testNewInputs _ [] _ _ _ _ _ = []
+        testNewInputs cond (inp:inputs) allpos provFormat i lt board = let newItem = lt ++ show i ++ "-" ++ inp in
+            if test cond allpos (provFormat ++ [newItem]) board
+                then newItem: testNewInputs cond inputs allpos provFormat i lt board 
+                else testNewInputs cond inputs allpos provFormat i lt board
+
+        --Find critical option 
+        testOldPos _ _ f [] _ = error (show f)
+        testOldPos cond allpos provFormat (x:xs) board = 
+            let prov = map (\y -> if y == x then "." else y) provFormat in -- replaces x in provFormat to test if its the critical option
+                if test cond allpos (prov ++ [x]) board
+                then provFormat ++ [x] 
+                else testOldPos cond allpos provFormat xs board
+
+        test cond allpos provFormat board = let newBoard = translate (combine allpos provFormat) board in 
+            case newBoard of 
+                Nothing -> False 
+                Just b -> cond b 
+
+        -- combines the old format with new Items
+        combine _ [] = []
+        combine (p:ps) (x:xs) = (p ++ [x]): combine ps xs  
+
+--dlf := dancing links formatting
+translate :: [[String]] -> [[String]] -> Maybe [[String]]
+translate dlf brd = let transdlf = transform [] dlf in  
+    let bdlf = bracketRows transdlf in 
+    let formatBoard = map (map (\x -> x!!1)) bdlf in 
+        getBoard brd formatBoard where
+      
+            getBoard board formatBoard = let zipped = map (\(bs,fs) -> zip bs fs) (zip board formatBoard) in 
+                if not (all (==True) (map (all (==True)) (map (map (\(b,f) -> b == "." || f == ".")) zipped))) then Nothing
+                    else Just (map (map (\(b,f) -> if b == "." then f else b)) zipped)  
+
+            bracketRows xss = 
+                let xs = bracketRowsHelper xss in 
+                let (res, _) = splitAt (length xss - length xs) xss in 
+                    if xs == [] then [res] else res:bracketRows xs
+
+            bracketRowsHelper [x] = []
+            bracketRowsHelper (x1:x2:xs) = if (x1!!0)!!1 == (x2!!0)!!1 then bracketRowsHelper (x2:xs) else x2:xs
+
+            transform _ [] = []
+            transform store (x:xs) = if elem (x!!1) store || (x!!1) == "." then [x!!0,"."]: transform store xs else 
+                [x!!0, getInput x]: transform ((x!!1):store) xs
+
+            getInput x = let input = splitOn "-" (x!!1) in input!!1 
+
+testTranslate = translate [["p00", "a0-Q"],["p01","a0-Q"]] [["-",".","-","-"],["-","-","-","-"]]
+
+translateFormat dlf = let transdlf = transform [] dlf in  
+    let bdlf = bracketRows transdlf in 
+    map (map (\x -> x!!1)) bdlf where
+        bracketRows xss = 
+            let xs = bracketRowsHelper xss in 
+            let (res, _) = splitAt (length xss - length xs) xss in 
+                if xs == [] then [res] else res:bracketRows xs
+
+        bracketRowsHelper [x] = []
+        bracketRowsHelper (x1:x2:xs) = if (x1!!0)!!1 == (x2!!0)!!1 then bracketRowsHelper (x2:xs) else x2:xs
+
+        transform _ [] = []
+        transform store (x:xs) = if elem (x!!1) store || (x!!1) == "." then [x!!0,"."]: transform store xs else 
+            [x!!0, getInput x]: transform ((x!!1):store) xs
+
+        getInput x = let input = splitOn "-" (x!!1) in input!!1 
