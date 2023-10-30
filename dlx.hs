@@ -18,7 +18,8 @@ dlx items options = runST (dlxInit items options) where
         nodes <- nodeArray options items
         bt <- newArray (0, length options) 0 --backtrack Array
         let n = length primary  --delimiter between primary and secondary items
-        let l = 0
+        let l = 0 
+        
         r <- getNext items l
         solutionIndices <- dlxLoop items nodes bt l n
         interpretSolution items nodes (map sort solutionIndices) where
