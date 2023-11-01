@@ -28,6 +28,8 @@ test3 =  ECP {input = Symbolic [show i | i <- [1..9]], board = TwoDim hardSudoku
 
 test4 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 4 4), primaryConds = Conditions [1,6], secondaryConds = Conditions [3,4]}
 
+test5 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 2 2), primaryConds = Conditions [1,6], secondaryConds = Conditions []}
+
 sudokuPuzzle = [["","","","2","6","","7","","1"],["6","8","","","7","","","9",""],["1","9","","","","4","5","",""],
                 ["8","2","","1","","","","4",""],["","","4","6","","2","9","",""],["","5","","","","3","","2","8"],
                 ["","","9","3","","","","7","4"],["","4","","","5","","","3","6"],["7","","3","","1","8","","",""]]
@@ -59,7 +61,7 @@ solve ecp =
 
 condsSymbolic :: [(Int, String)]
 condsSymbolic = [(1, "x inputs per row"), (2,"x inputs per column"), (3, "x inputs in the top left to bottom right diagonal"),
-    (4, "x inputs in the top right to bottom left diagonal"), (5,"x inputs in an n*m box"), (6,"s inputs per custom shape"), 
+    (4, "x inputs in the top right to bottom left diagonal"), (5,"x inputs in an n*m box"), (6,"x inputs per custom shape"), 
     (7,"connected inputs"), (8,"no edges between inputs")]
 
 main = do
