@@ -10,49 +10,53 @@ import Control.Monad
 
 data Input = Symbolic [String] | Shape [[String]]
 data Board a = OneDim [String] | TwoDim [[String]] | Custom [a]
-data Conditions = Conditions [Int] | ManualSelect
+data Constraints = Constraints [Int] | ManualSelect
 
 data Exact_Cover a = ECP {
     input :: Input,
     board :: Board a,
-    primaryConds :: Conditions,
-    secondaryConds :: Conditions
+    primaryCons :: Constraints,
+    secondaryCons :: Constraints
 }
 rectangle x y = [[""| x <- [1..x]] | y <- [1..y]]
 --Queens 4
-test = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 4 4), primaryConds = Conditions [1,2], secondaryConds = Conditions [3,4]}
+test = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 8 8), primaryCons = Constraints [1,2], secondaryCons = Constraints [3,4]}
 --Queens 4 with an predetermined input 
-test2 = ECP {input = Symbolic ["Q"], board = TwoDim [["","Q","",""],["","","",""],["","","",""],["","","",""]], primaryConds = Conditions [1,2], secondaryConds = Conditions [3,4]}
+test2 = ECP {input = Symbolic ["Q"], board = TwoDim [["","Q","",""],["","","",""],["","","",""],["","","",""]], primaryCons = Constraints [1,2], secondaryCons = Constraints [3,4]}
 --Sudoku
-test3 =  ECP {input = Symbolic [show i | i <- [1..9]], board = TwoDim hardSudokuPuzzle, primaryConds = Conditions [1,2,5], secondaryConds = Conditions []}
+test3 =  ECP {input = Symbolic [show i | i <- [1..9]], board = TwoDim hardSudokuPuzzle, primaryCons = Constraints [1,2,5], secondaryCons = Constraints []}
 
-test4 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 4 4), primaryConds = Conditions [1,6], secondaryConds = Conditions [3,4]}
+test4 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 4 4), primaryCons = Constraints [1,6], secondaryCons = Constraints [3,4]}
 
-test5 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 2 2), primaryConds = Conditions [1,6], secondaryConds = Conditions []}
+test5 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 2 2), primaryCons = Constraints [1,6], secondaryCons = Constraints []}
+
+test6 = ECP {input = Symbolic [show i | i <- [1..7]], board = TwoDim filominoPuzzle, primaryCons = Constraints [7], secondaryCons = Constraints []}
 
 sudokuPuzzle = [["","","","2","6","","7","","1"],["6","8","","","7","","","9",""],["1","9","","","","4","5","",""],
                 ["8","2","","1","","","","4",""],["","","4","6","","2","9","",""],["","5","","","","3","","2","8"],
                 ["","","9","3","","","","7","4"],["","4","","","5","","","3","6"],["7","","3","","1","8","","",""]]
 
+
 hardSudokuPuzzle = [["","2","","","","","","",""],["","","","6","","","","","3"],["","7","4","","8","","","",""],
                     ["","","","","","3","","","2"],["","8","","","4","","","1",""],["6","","","5","","","","",""],
                     ["","","","","1","","7","8",""],["5","","","","","9","","",""],["","","","","","","","4",""]]
 
+filominoPuzzle = [["","2","7","",""],["7","","","3","1"],["6","","","","7"],["","","6","",""],["6","","3","","1"]]
 
-solve :: Exact_Cover a -> IO ()
+--solve :: Exact_Cover a -> IO ()
 solve ecp =
     case input ecp of
         Symbolic inp ->
             case board ecp of
                 OneDim brd -> return ()
                 TwoDim brd ->
-                    case primaryConds ecp of
-                        Conditions prim ->
-                            if not (all (\x -> x `elem` map fst condsSymbolic) prim) then error "Conditions not found" else
+                    case primaryCons ecp of
+                     Constraints prim ->
+                            if not (all (\x -> x `elem` map fst condsSymbolic) prim) then error "Constraints not found" else
                                 let condsSymbolicUpdate = filter (\(i, _) -> i `notElem` prim) condsSymbolic in
-                                case secondaryConds ecp of
-                                    Conditions sec ->
-                                        if not (all (\x -> x `elem` map fst condsSymbolicUpdate) sec) then error "Conditions not found" else do
+                                case secondaryCons ecp of
+                                 Constraints sec ->
+                                        if not (all (\x -> x `elem` map fst condsSymbolicUpdate) sec) then error "Constraints not found" else do
                                             options <- getSymbolicFormat (prim++sec) brd inp
                                             let items = getItems options (length prim)
                                             putStr (interpret brd (dlx items options))
@@ -138,30 +142,30 @@ getConds conds unselectable str = do
         putStrLn "Does your problem have any secondary items? (y/n)"
         sec <- getLine
         if 'y' == toLower (head sec) then do
-            putStrLn ("Select your "++ str ++ " conditions\n")
+            putStrLn ("Select your "++ str ++ " Constraints\n")
             selectConds unselectable [] conds
         else return []
     else do
-        putStrLn ("Select your "++ str ++ " conditions\n")
+        putStrLn ("Select your "++ str ++ " Constraints\n")
         selectConds unselectable [] conds
 
 selectConds :: [Int] -> [Int] -> [(Int, [Char])] -> IO [Int]
 selectConds unselectable selected conds  = do
-    let conditions = filter (\(i, _) -> i `notElem` (selected ++ unselectable)) conds
-    putStrLn (foldr (\(i,n) r -> "("++ show i ++") " ++ n ++ "\n" ++ r) "" conditions ++ "Press 'q' to quit selection")
+    let constraints = filter (\(i, _) -> i `notElem` (selected ++ unselectable)) conds
+    putStrLn (foldr (\(i,n) r -> "("++ show i ++") " ++ n ++ "\n" ++ r) "" constraints ++ "Press 'q' to quit selection")
     cond <- getLine
     if 'q' == toLower (head cond) then helper (init selected)  (show (last selected)) else
-        if read cond `notElem` map fst conditions
+        if read cond `notElem` map fst constraints
         then do
             putStrLn "I didn't understand that input. \n Write one of the shown Integers"
             selectConds unselectable selected conds
         else do
             putStrLn ("You selected: " ++ snd (head (filter (\(i,n) -> show i == cond) conds)))
-            if length conditions == 1 then helper selected cond
+            if length constraints == 1 then helper selected cond
             else do selectConds unselectable (selected ++ [read cond]) conds
         where
             helper selected  cond = do
-                putStrLn "Are you sure about these conditions: (y/n)"
+                putStrLn "Are you sure about these Constraints: (y/n)"
                 putStr (foldr (\x r -> snd ( head (filter (\(i,n) -> i == x) conds))++ "\n" ++ r) "" (selected ++ [read cond]))
                 redo <- getLine
                 if 'y' == toLower (head redo) then return (selected ++ [read cond]) else
@@ -174,13 +178,13 @@ selectConds unselectable selected conds  = do
 
 
 {- 
-All Exact-Cover problems with 2 dimensions or lower that need only primary and secondary conditions should be solvable with this dsl
+All Exact-Cover problems with 2 dimensions or lower that need only primary and secondary Constraints should be solvable with this dsl
 
 data Exact_Cover_Problem = ECS {
     inputs :: [String], -- all the possible inputs for the problem
     board :: [[String]], -- the initial board state 
-    primaryConditions :: [[[String]] -> Bool], -- the primary conditions for the problem 
-    secondaryConditions :: [[[String]] -> Bool], -- the secondary conditions for the problem 
+    primar Constraints :: [[[String]] -> Bool], -- the primary Constraints for the problem 
+    secondar Constraints :: [[[String]] -> Bool], -- the secondary Constraints for the problem 
     -- some quality of life things  
     interpretResults :: Bool, -- fill in the dlx formatted solution into the initial board state 
     showInitialBoard :: Bool, -- show the initial board at the start of output 
@@ -191,8 +195,8 @@ queens :: Int -> Exact_Cover_Problem
 queens i = ECS {
     inputs = ["Q"],
     board = [["" | x <- [1..i]] | y <- [1..i]],
-    primaryConditions = [rowCond,colCond],
-    secondaryConditions = [lrDiag, rlDiag],
+    primar Constraints = [rowCond,colCond],
+    secondar Constraints = [lrDiag, rlDiag],
     interpretResults = True,
     showInitialBoard = False,
     numberOfResults = 2
@@ -221,8 +225,8 @@ sudoku :: Exact_Cover_Problem
 sudoku = ECS {
     inputs = [show i | i <- [1..9]],
     board = hardSudokuPuzzle,
-    primaryConditions = [rowCondSudoku, colCondSudoku, boxCondSudoku],
-    secondaryConditions = [],
+    primar Constraints = [rowCondSudoku, colCondSudoku, boxCondSudoku],
+    secondar Constraints = [],
     interpretResults = True,
     showInitialBoard = True,
     numberOfResults = 2
@@ -257,8 +261,8 @@ ian :: Exact_Cover_Problem
 ian = ECS {
     inputs = [show i | i <- [1..4]],
     board = [["" | x <- [1..6]] | x <- [1..6]],
-    primaryConditions = [horizontalCond],
-    secondaryConditions = [],
+    primar Constraints = [horizontalCond],
+    secondar Constraints = [],
     interpretResults = True,
     showInitialBoard = True,
     numberOfResults = 1
