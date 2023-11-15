@@ -2,35 +2,72 @@
 {-# HLINT ignore "Use camelCase" #-}
 
 import Dlx
-import DlxFormat ( getSymbolicFormat, getItems, interpret)
+import DlxFormat ( getSymbolicFormat, getItems, interpret, interpretConnectedInputs)
 import Data.Char
 import Data.List
 import Data.List.Split
 import Control.Monad
 
 data Input = Symbolic [String] | Shape [[String]]
-data Board a = OneDim [String] | TwoDim [[String]] | Custom [a]
+type Board = [[String]] 
 data Constraints = Constraints [Int] | ManualSelect
 
 data Exact_Cover a = ECP {
     input :: Input,
-    board :: Board a,
+    board :: Board,
     primaryCons :: Constraints,
     secondaryCons :: Constraints
 }
 rectangle x y = [[""| x <- [1..x]] | y <- [1..y]]
 --Queens 4
-test = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 8 8), primaryCons = Constraints [1,2], secondaryCons = Constraints [3,4]}
+test = ECP {input = Symbolic ["Q"], 
+            board = rectangle 8 8, 
+            primaryCons = Constraints [rowCons,colCons], 
+            secondaryCons = Constraints [lrDiagCons,rlDiagCons]}
 --Queens 4 with an predetermined input 
-test2 = ECP {input = Symbolic ["Q"], board = TwoDim [["","Q","",""],["","","",""],["","","",""],["","","",""]], primaryCons = Constraints [1,2], secondaryCons = Constraints [3,4]}
+test2 = ECP {input = Symbolic ["Q"], 
+            board = [["","Q","",""],["","","",""],["","","",""],["","","",""]], 
+            primaryCons = Constraints [rowCons,colCons], 
+            secondaryCons = Constraints [lrDiagCons,rlDiagCons]}
 --Sudoku
-test3 =  ECP {input = Symbolic [show i | i <- [1..9]], board = TwoDim hardSudokuPuzzle, primaryCons = Constraints [1,2,5], secondaryCons = Constraints []}
+test3 = ECP {input = Symbolic [show i | i <- [1..9]], 
+            board = hardSudokuPuzzle, 
+            primaryCons = Constraints [rowCons,colCons,boxCons], 
+            secondaryCons = Constraints []}
 
-test4 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 4 4), primaryCons = Constraints [1,6], secondaryCons = Constraints [3,4]}
+test4 = ECP {input = Symbolic ["Q"], 
+            board = rectangle 4 4, 
+            primaryCons = Constraints [rowCons,customCons], 
+            secondaryCons = Constraints [lrDiagCons,rlDiagCons]}
 
-test5 = ECP {input = Symbolic ["Q"], board = TwoDim (rectangle 2 2), primaryCons = Constraints [1,6], secondaryCons = Constraints []}
+test5 = ECP {input = Symbolic ["Q"], 
+            board = rectangle 2 2, 
+            primaryCons = Constraints [rowCons,customCons], 
+            secondaryCons = Constraints []}
 
-test6 = ECP {input = Symbolic [show i | i <- [1..7]], board = TwoDim filominoPuzzle, primaryCons = Constraints [7], secondaryCons = Constraints []}
+test6 = ECP {input = Symbolic [show i | i <- [1..7]], 
+            board = filominoPuzzle, 
+            primaryCons = Constraints [connectedInputs], 
+            secondaryCons = Constraints []}
+rowCons :: Int
+rowCons = 1
+colCons :: Int
+colCons = 2
+lrDiagCons :: Int
+lrDiagCons = 3
+rlDiagCons :: Int
+rlDiagCons = 4
+boxCons :: Int
+boxCons = 5
+customCons :: Int
+customCons = 6
+connectedInputs :: Int
+connectedInputs = 7
+
+condsSymbolic :: [(Int, String)]
+condsSymbolic = [(1, "x inputs per row"), (2,"x inputs per column"), (3, "x inputs in the top left to bottom right diagonal"),
+    (4, "x inputs in the top right to bottom left diagonal"), (5,"x inputs in an n*m box"), (6,"x inputs per custom shape"), 
+    (7,"connected inputs")]
 
 sudokuPuzzle = [["","","","2","6","","7","","1"],["6","8","","","7","","","9",""],["1","9","","","","4","5","",""],
                 ["8","2","","1","","","","4",""],["","","4","6","","2","9","",""],["","5","","","","3","","2","8"],
@@ -43,99 +80,92 @@ hardSudokuPuzzle = [["","2","","","","","","",""],["","","","6","","","","","3"]
 
 filominoPuzzle = [["","2","7","",""],["7","","","3","1"],["6","","","","7"],["","","6","",""],["6","","3","","1"]]
 
---solve :: Exact_Cover a -> IO ()
+solve :: Exact_Cover a -> IO ()
 solve ecp =
-    case input ecp of
-        Symbolic inp ->
-            case board ecp of
-                OneDim brd -> return ()
-                TwoDim brd ->
-                    case primaryCons ecp of
-                     Constraints prim ->
-                            if not (all (\x -> x `elem` map fst condsSymbolic) prim) then error "Constraints not found" else
-                                let condsSymbolicUpdate = filter (\(i, _) -> i `notElem` prim) condsSymbolic in
-                                case secondaryCons ecp of
-                                 Constraints sec ->
-                                        if not (all (\x -> x `elem` map fst condsSymbolicUpdate) sec) then error "Constraints not found" else do
-                                            options <- getSymbolicFormat (prim++sec) brd inp
-                                            let items = getItems options (length prim)
-                                            putStr (interpret brd (dlx items options))
+  case input ecp of
+    Symbolic inp ->
+      let brd = board ecp in
+      case primaryCons ecp of
+        Constraints prim ->
+          if not (all (\x -> x `elem` map fst condsSymbolic) prim) then error "Constraints not found" else
+            let condsSymbolicUpdate = filter (\(i, _) -> i `notElem` prim) condsSymbolic in
+            case secondaryCons ecp of
+              Constraints sec ->
+                if not (all (\x -> x `elem` map fst condsSymbolicUpdate) sec) then error "Constraints not found" else do
+                  (items, options) <- getSymbolicFormat (prim++sec) brd inp (length prim) 
+                  if prim++sec == [7] then 
+                    putStr (interpretConnectedInputs brd (dlx items options ))
+                  else putStr (interpret brd (dlx items options))
 
-        Shape inp -> return ()
-
-condsSymbolic :: [(Int, String)]
-condsSymbolic = [(1, "x inputs per row"), (2,"x inputs per column"), (3, "x inputs in the top left to bottom right diagonal"),
-    (4, "x inputs in the top right to bottom left diagonal"), (5,"x inputs in an n*m box"), (6,"x inputs per custom shape"), 
-    (7,"connected inputs"), (8,"no edges between inputs")]
+    Shape inp -> return ()
 
 main = do
-    inputs <- getInputs
-    board <- getBoard
-    primary <- getConds condsSymbolic [] "primary"
-    secondary <- getConds condsSymbolic primary "secondary"
-    options <- getSymbolicFormat (primary ++ secondary) board inputs
-    let items = getItems options (length primary)
-    return (dlx items options)
-    where
-        getInputs = do
-            putStrLn "What kind of Inputs do you have? (symbolic = 1, shape = 2)"
-            kindInput <- getLine
-            if kindInput == "1"
-            then do
-                putStrLn "Tell me the name of your inputs (with a ' ' between inputs)"
-                splitOn " " <$> getLine
-            else do return []
+  inputs <- getInputs
+  board <- getBoard
+  primary <- getConds condsSymbolic [] "primary"
+  secondary <- getConds condsSymbolic primary "secondary"
+  (items, options) <- getSymbolicFormat (primary ++ secondary) board inputs (length primary)
+  return (dlx items options)
+  where
+    getInputs = do
+      putStrLn "What kind of Inputs do you have? (symbolic = 1, shape = 2)"
+      kindInput <- getLine
+      if kindInput == "1"
+      then do
+        putStrLn "Tell me the name of your inputs (with a ' ' between inputs)"
+        splitOn " " <$> getLine
+      else do return []
 
-        getBoard = do
-            putStrLn "Does your board have fixed inputs (y/n)"
-            hasInputs <- getLine
-            putStrLn "What kind of Board do you have? (1D = 1, 2D = 2, higher = 3)"
-            kindBoard <- getLine
-            if hasInputs == "y"
-            then boardWithInputs kindBoard
-            else boardWithoutInputs kindBoard
+    getBoard = do
+      putStrLn "Does your board have fixed inputs (y/n)"
+      hasInputs <- getLine
+      putStrLn "What kind of Board do you have? (1D = 1, 2D = 2, higher = 3)"
+      kindBoard <- getLine
+      if hasInputs == "y"
+      then boardWithInputs kindBoard
+      else boardWithoutInputs kindBoard
 
-        boardWithInputs kindBoard =
-            case kindBoard of
-                "1" -> do
-                    putStrLn "How many elements does your Board have (' ' between inputs, '-' if empty)"
-                    row <- getLine
-                    return [map (\x -> if x == "-" then "" else x) (splitOn " " row)]
-                "2" -> do
-                    putStrLn "How does your board look?"
-                    putStrLn "Type the rows line by line \n'-' if elem empty, '.' if col doesn't exist in row, ' ' between each elem, and 'quit' if you are done"
-                    typeBoard []
+    boardWithInputs kindBoard =
+      case kindBoard of
+        "1" -> do
+          putStrLn "How many elements does your Board have (' ' between inputs, '-' if empty)"
+          row <- getLine
+          return [map (\x -> if x == "-" then "" else x) (splitOn " " row)]
+        "2" -> do
+          putStrLn "How does your board look?"
+          putStrLn "Type the rows line by line \n'-' if elem empty, '.' if col doesn't exist in row, ' ' between each elem, and 'quit' if you are done"
+          typeBoard []
 
-        boardWithoutInputs kindBoard =
-            case kindBoard of
-                "1" -> do
-                    putStrLn "How many elements does your Board have"
-                    n <- getLine
-                    return [["" | x <- [1..(read n)]]]
-                "2" -> do
-                    board2d
+    boardWithoutInputs kindBoard =
+      case kindBoard of 
+        "1" -> do
+          putStrLn "How many elements does your Board have"
+          n <- getLine
+          return [["" | x <- [1..(read n)]]]
+        "2" -> do
+          board2d
 
-        board2d = do
-            putStrLn "What kind of shape does your board have? (rectangle = 1, custom = 2)"
-            shape <- getLine
-            if shape == "1" then do
-                putStrLn "How many rows?"
-                rows <- getLine
-                putStrLn "How many columns?"
-                cols <- getLine
-                return [[""| x <- [1..(read cols)]] | y <- [1..(read rows)]]
-            else do
-                putStrLn "How does your board look?"
-                putStrLn "Type the rows line by line \n'-' if elem empty, '.' if col doesn't exist in row, ' ' between each elem, and 'quit' if you are done"
-                typeBoard []
+    board2d = do
+        putStrLn "What kind of shape does your board have? (rectangle = 1, custom = 2)"
+        shape <- getLine
+        if shape == "1" then do
+            putStrLn "How many rows?"
+            rows <- getLine
+            putStrLn "How many columns?"
+            cols <- getLine
+            return [[""| x <- [1..(read cols)]] | y <- [1..(read rows)]]
+        else do
+            putStrLn "How does your board look?"
+            putStrLn "Type the rows line by line \n'-' if elem empty, '.' if col doesn't exist in row, ' ' between each elem, and 'quit' if you are done"
+            typeBoard []
 
-        typeBoard board = do
-            row <- getLine
-            if row == "quit"
-            then return board
-            else do
-                let filterdRow = map (\x -> if x == "-" then "" else x) (filter (/=".") (splitOn " " row))
-                typeBoard (board ++ [filterdRow])
+    typeBoard board = do
+        row <- getLine
+        if row == "quit"
+        then return board
+        else do
+            let filterdRow = map (\x -> if x == "-" then "" else x) (filter (/=".") (splitOn " " row))
+            typeBoard (board ++ [filterdRow])
 
 getConds conds unselectable str = do
     if str == "secondary" then do
