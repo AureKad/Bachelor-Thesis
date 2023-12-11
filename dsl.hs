@@ -8,65 +8,81 @@ import Data.List
 import Data.List.Split
 import Control.Monad
 
-data Input = Symbolic [String] | Shape [[String]]
-type Board = [[String]] 
+data Input = InputsAndOccurences [(Int, String)] | ManuallySelectOccurence [String]
+type Board = [[String]]
 data Constraints = Constraints [Int] | ManualSelect
-
-data Exact_Cover a = ECP {
+data Exact_Cover = ECP {
     input :: Input,
     board :: Board,
     primaryCons :: Constraints,
-    secondaryCons :: Constraints
+    secondaryCons :: Constraints,
+    showInitial :: Bool -- show initial board
 }
+rectangle :: (Num t1, Num t2, Enum t1, Enum t2) => t2 -> t1 -> [[String]]
 rectangle x y = [[""| x <- [1..x]] | y <- [1..y]]
+
+occurEach :: [a] -> t -> [(t, a)]
+occurEach inputs i = map (i,) inputs
+
+occurs :: b -> a -> [(a, b)]
+occurs input i = [(i, input)]              
+
+next :: [a] -> [a] -> [a] 
+next a b = a ++ b
+
+empty :: [a]
+empty = []
+
 --Queens 4
-test = ECP {input = Symbolic ["Q"], 
-            board = rectangle 8 8, 
-            primaryCons = Constraints [rowCons,colCons], 
-            secondaryCons = Constraints [lrDiagCons,rlDiagCons]}
+test = ECP {input = InputsAndOccurences ("Q" `occurs` 1),
+            board = rectangle 8 8,
+            primaryCons = Constraints (rowCons `next` colCons),
+            secondaryCons = Constraints (downDiagCons `next` upDiagCons),
+            showInitial = True}
 --Queens 4 with an predetermined input 
-test2 = ECP {input = Symbolic ["Q"], 
-            board = [["","Q","",""],["","","",""],["","","",""],["","","",""]], 
-            primaryCons = Constraints [rowCons,colCons], 
-            secondaryCons = Constraints [lrDiagCons,rlDiagCons]}
+test2 = ECP {input = ManuallySelectOccurence ["Q"],
+            board = [["","Q","",""],["","","",""],["","","",""],["","","",""]],
+            primaryCons = Constraints (rowCons `next` colCons),
+            secondaryCons = Constraints (downDiagCons `next` upDiagCons),
+            showInitial = True}
 --Sudoku
-test3 = ECP {input = Symbolic [show i | i <- [1..9]], 
-            board = hardSudokuPuzzle, 
-            primaryCons = Constraints [rowCons,colCons,boxCons], 
-            secondaryCons = Constraints []}
+test3 = ECP {input = InputsAndOccurences ([show i | i <- [1..9]] `occurEach` 1),
+            board = sudokuPuzzle,
+            primaryCons = Constraints (rowCons `next` colCons `next` boxCons),
+            secondaryCons = Constraints empty,
+            showInitial = True}
 
-test4 = ECP {input = Symbolic ["Q"], 
-            board = rectangle 4 4, 
-            primaryCons = Constraints [rowCons,customCons], 
-            secondaryCons = Constraints [lrDiagCons,rlDiagCons]}
+test4 = ECP {input = InputsAndOccurences (["Q"] `occurEach` 1),
+            board = rectangle 2 2,
+            primaryCons = Constraints (rowCons `next` customCons),
+            secondaryCons = Constraints empty,
+            showInitial = True}
 
-test5 = ECP {input = Symbolic ["Q"], 
-            board = rectangle 2 2, 
-            primaryCons = Constraints [rowCons,customCons], 
-            secondaryCons = Constraints []}
+test5 = ECP {input = InputsAndOccurences (("1" `occurs` 1) `next` ("2" `occurs` 2) `next` ("3" `occurs` 3) `next` ("4" `occurs` 4) 
+                                          `next` ("5" `occurs` 5) `next` ("6" `occurs` 6) `next` ("7" `occurs` 7)),
+            board = filominoPuzzle,
+            primaryCons = Constraints connectedInputs,
+            secondaryCons = Constraints empty,
+            showInitial = True}
 
-test6 = ECP {input = Symbolic [show i | i <- [1..7]], 
-            board = filominoPuzzle, 
-            primaryCons = Constraints [connectedInputs], 
-            secondaryCons = Constraints []}
-rowCons :: Int
-rowCons = 1
-colCons :: Int
-colCons = 2
-lrDiagCons :: Int
-lrDiagCons = 3
-rlDiagCons :: Int
-rlDiagCons = 4
-boxCons :: Int
-boxCons = 5
-customCons :: Int
-customCons = 6
-connectedInputs :: Int
-connectedInputs = 7
+rowCons :: [Int]
+rowCons = [1]
+colCons :: [Int]
+colCons = [2]
+downDiagCons :: [Int]
+downDiagCons = [3]
+upDiagCons :: [Int]
+upDiagCons = [4]
+boxCons :: [Int]
+boxCons = [5]
+customCons :: [Int]
+customCons = [6]
+connectedInputs :: [Int]
+connectedInputs = [7]
 
 condsSymbolic :: [(Int, String)]
 condsSymbolic = [(1, "x inputs per row"), (2,"x inputs per column"), (3, "x inputs in the top left to bottom right diagonal"),
-    (4, "x inputs in the top right to bottom left diagonal"), (5,"x inputs in an n*m box"), (6,"x inputs per custom shape"), 
+    (4, "x inputs in the top right to bottom left diagonal"), (5,"x inputs in an n*m box"), (6,"x inputs per custom shape"),
     (7,"connected inputs")]
 
 sudokuPuzzle = [["","","","2","6","","7","","1"],["6","8","","","7","","","9",""],["1","9","","","","4","5","",""],
@@ -80,25 +96,34 @@ hardSudokuPuzzle = [["","2","","","","","","",""],["","","","6","","","","","3"]
 
 filominoPuzzle = [["","2","7","",""],["7","","","3","1"],["6","","","","7"],["","","6","",""],["6","","3","","1"]]
 
-solve :: Exact_Cover a -> IO ()
+solve :: Exact_Cover -> IO ()
 solve ecp =
-  case input ecp of
-    Symbolic inp ->
-      let brd = board ecp in
-      case primaryCons ecp of
-        Constraints prim ->
-          if not (all (\x -> x `elem` map fst condsSymbolic) prim) then error "Constraints not found" else
-            let condsSymbolicUpdate = filter (\(i, _) -> i `notElem` prim) condsSymbolic in
-            case secondaryCons ecp of
-              Constraints sec ->
-                if not (all (\x -> x `elem` map fst condsSymbolicUpdate) sec) then error "Constraints not found" else do
-                  (items, options) <- getSymbolicFormat (prim++sec) brd inp (length prim) 
-                  if prim++sec == [7] then 
-                    putStr (interpretConnectedInputs brd (dlx items options ))
-                  else putStr (interpret brd (dlx items options))
+  let brd = board ecp in
+  case primaryCons ecp of
+    ManualSelect -> return () 
+    Constraints prim ->
+      if not (all (\x -> x `elem` map fst condsSymbolic) prim) then error "Constraints not found" else
+        let condsSymbolicUpdate = filter (\(i, _) -> i `notElem` prim) condsSymbolic in
+        case secondaryCons ecp of
+          ManualSelect -> return () 
+          Constraints sec ->
+            if not (all (\x -> x `elem` map fst condsSymbolicUpdate) sec) then error "Constraints not found" else do
+              let inp = case input ecp of 
+                    ManuallySelectOccurence inputs -> occurEach inputs (-1)
+                    InputsAndOccurences inputs -> inputs
+              (items, options) <- getSymbolicFormat (prim++sec) brd inp (length prim)
+              let initial = if showInitial ecp then initialBoard brd else ""
+              let solutions = dlx items options
+              if prim++sec == [7] then
+                putStr (initial ++ interpretConnectedInputs brd solutions)
+              else putStr (initial ++ interpret brd solutions ++ "There are " ++ show (length solutions) ++ " solutions to this puzzle\n")
 
-    Shape inp -> return ()
+initialBoard :: [[String]] -> String
+initialBoard board = let init = "Initial board:\n" in
+  let results = "Results:\n" in
+  init ++ foldr (\xs r -> foldr (\x r2 -> if x == "" then "- " ++ r2 else x ++ " " ++ r2) "" xs++ "\n" ++ r) "\n" board ++ results
 
+{-
 main = do
   inputs <- getInputs
   board <- getBoard
@@ -137,7 +162,7 @@ main = do
           typeBoard []
 
     boardWithoutInputs kindBoard =
-      case kindBoard of 
+      case kindBoard of
         "1" -> do
           putStrLn "How many elements does your Board have"
           n <- getLine
@@ -200,119 +225,4 @@ selectConds unselectable selected conds  = do
                 redo <- getLine
                 if 'y' == toLower (head redo) then return (selected ++ [read cond]) else
                     selectConds unselectable [] conds
-
-
-
-
-
-
-
-{- 
-All Exact-Cover problems with 2 dimensions or lower that need only primary and secondary Constraints should be solvable with this dsl
-
-data Exact_Cover_Problem = ECS {
-    inputs :: [String], -- all the possible inputs for the problem
-    board :: [[String]], -- the initial board state 
-    primar Constraints :: [[[String]] -> Bool], -- the primary Constraints for the problem 
-    secondar Constraints :: [[[String]] -> Bool], -- the secondary Constraints for the problem 
-    -- some quality of life things  
-    interpretResults :: Bool, -- fill in the dlx formatted solution into the initial board state 
-    showInitialBoard :: Bool, -- show the initial board at the start of output 
-    numberOfResults :: Int} -- how many results shown (negative int for all)
-
-
-queens :: Int -> Exact_Cover_Problem
-queens i = ECS {
-    inputs = ["Q"],
-    board = [["" | x <- [1..i]] | y <- [1..i]],
-    primar Constraints = [rowCond,colCond],
-    secondar Constraints = [lrDiag, rlDiag],
-    interpretResults = True,
-    showInitialBoard = False,
-    numberOfResults = 2
-    } where
-    -- Exported from Data.Universe.Helpers
-        diagonals :: [[a]] -> [[a]]
-        diagonals = tail . go [] where
-        go b es_ = [h | h:_ <- b] : case es_ of
-            []   -> transpose ts
-            e:es -> go (e:ts) es
-            where ts = [t | _:t <- b]
-
-        rowCond :: [[String]] -> Bool
-        rowCond board = all (<=1) (map (\xs -> sum (map (\x -> if x /= "" then 1 else 0) xs )) board)
-
-        colCond :: [[String]] -> Bool
-        colCond board = all (<=1) (map (\xs -> sum (map (\x -> if x /= "" then 1 else 0) xs)) (transpose board))
-
-        lrDiag :: [[String]] -> Bool
-        lrDiag board = all (<=1) (map (\xs -> sum (map (\x -> if x /= "" then 1 else 0) xs)) (diagonals board))
-
-        rlDiag :: [[String]] -> Bool
-        rlDiag board = all (<=1) (map (\xs -> sum (map (\x -> if x /= "" then 1 else 0) xs)) (diagonals (reverse board)))
-
-sudoku :: Exact_Cover_Problem
-sudoku = ECS {
-    inputs = [show i | i <- [1..9]],
-    board = hardSudokuPuzzle,
-    primar Constraints = [rowCondSudoku, colCondSudoku, boxCondSudoku],
-    secondar Constraints = [],
-    interpretResults = True,
-    showInitialBoard = True,
-    numberOfResults = 2
-    } where
-
-        rowCondSudoku :: [[String]] -> Bool
-        rowCondSudoku board = let inputs = [show x | x <- [1..9]] in
-            all (==True) (map (all (<=1)) (map (\input -> map (\xs -> sum (map (\x -> if x == input then 1 else 0) xs)) board ) inputs))
-
-        colCondSudoku :: [[String]] -> Bool
-        colCondSudoku board = let inputs = [show x | x <- [1..9]] in
-            all (==True) (map (all (<=1)) (map (\input -> map (\xs -> sum (map (\x -> if x == input then 1 else 0) xs)) (transpose board) ) inputs))
-
-        boxCondSudoku :: [[String]] -> Bool
-        boxCondSudoku board = let inputs = [show x | x <- [1..9]] in
-            all (==True) (map (all (<=1)) (map (\input -> map (\xs -> sum (map (\x -> if x == input then 1 else 0) xs)) (getBoxs board)) inputs)) where
-                getBoxs board = concat (map (\i -> foldr (\j rs -> (foldr (\x r -> take 3 (drop (3*j) x) ++ r) []  (take 3 (drop (3*i) board))): rs ) [] [0..2]) [0..2])
-
--- https://sandiway.arizona.edu/sudoku/examples.html 
-
---sudoku takes a minute to compute =)
-sudokuPuzzle = [["","","","2","6","","7","","1"],["6","8","","","7","","","9",""],["1","9","","","","4","5","",""],
-                ["8","2","","1","","","","4",""],["","","4","6","","2","9","",""],["","5","","","","3","","2","8"],
-                ["","","9","3","","","","7","4"],["","4","","","5","","","3","6"],["7","","3","","1","8","","",""]]
-
-
-hardSudokuPuzzle = [["","2","","","","","","",""],["","","","6","","","","","3"],["","7","4","","8","","","",""],
-                    ["","","","","","3","","","2"],["","8","","","4","","","1",""],["6","","","5","","","","",""],
-                    ["","","","","1","","7","8",""],["5","","","","","9","","",""],["","","","","","","","4",""]]
--- mein dlxFormating hat probleme wenn erwartet wird dass ein input mehrfach für eine bedingung auftauchen soll   
-ian :: Exact_Cover_Problem
-ian = ECS {
-    inputs = [show i | i <- [1..4]],
-    board = [["" | x <- [1..6]] | x <- [1..6]],
-    primar Constraints = [horizontalCond],
-    secondar Constraints = [],
-    interpretResults = True,
-    showInitialBoard = True,
-    numberOfResults = 1
-    } where
-rowCond :: [[String]] -> Bool
-rowCond board = let inputs = [x | x <- [1..3]] in
-    all ((==True) . all (==True)) (map (\input -> (map (\xs -> sum (map (\x -> if x == (show input) then 1 else 0) xs)<=input) board )) inputs)
-
-colCond :: [[String]] -> Bool
-colCond board = let inputs = [x | x <- [1..3]] in
-    all (==True) (map (all (==True)) (map (\input -> (map (\xs -> sum (map (\x -> if x == (show input) then 1 else 0) xs) <= input) (transpose board)) ) inputs))
-
-horizontalCond :: [[String]] -> Bool
-horizontalCond = all connected where
-        connected [x] = True
-        connected (x:y:xs) = (x == "" || x /= y) && connected (y:xs)
-
-verticalCond :: [[String]] -> Bool
-verticalCond board = all connected (transpose board) where
-        connected [x] = True
-        connected (x:y:xs) = (x /= y) && connected (y:xs)
-testCond = horizontalCond [["1","2","3","-","-","-","-","-","-"], ["-","-","-","-","-","-","-","-","-","-"]]
 -}
