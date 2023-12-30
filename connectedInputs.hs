@@ -1,3 +1,10 @@
+{-
+Description: See Chapter 5.3 for a vague description or Fillomino-DLX in Donald Knuth's works
+  https://www-cs-faculty.stanford.edu/~knuth/programs.html for a more detailed description
+Input: initial board, inputs, constraint letter
+Output: format/options
+-}
+
 module ConnectedInputs(connectedInputs) where 
 import Data.Char
 

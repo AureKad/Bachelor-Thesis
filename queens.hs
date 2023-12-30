@@ -1,6 +1,16 @@
+{-
+In this module Algorithm 5 and 6 from Chapter 4.2.2 are covered.
+Rewritten it from Knuth's website. Creates a dlx format for the Queens problem.
+-}
+
 module Queens where 
 import Data.Char
 
+{-
+Description: Creates a dlx format for the queens problem (Algorithm 5)
+Input: Integer (describes how big the board is/how many queens are placed)
+Output: dlxFormat ((primary items, secondary items), options)
+-}
 queens :: Int -> (([String],[String]), [[String]])
 queens n = ((primary n,secondary (2*n-3)),options (n-1) n) 
   where 
@@ -30,6 +40,11 @@ queens n = ((primary n,secondary (2*n-3)),options (n-1) n)
       let b = if n-1-j+k >0 && (n-1-j+k <= 2*n-3) then ["b" ++ encode (n-1-j+k)] else [] in 
           [rc ++ a ++ b] 
 
+{-
+Description: Creates from DLX solutions interpreted board solutions (Algorithm 6)
+Input: number of queens, dlx solutions
+Output: interpreted queens solutions
+-}
 interpretQueens :: Int -> [[[String]]] -> String 
 interpretQueens n sols = let interpretedRows = map (map (interpretRow n)) sols in 
   foldr (\x r -> (foldr (\y l -> y ++ "\n" ++ l) "\n" x) ++ r) "" interpretedRows where 
