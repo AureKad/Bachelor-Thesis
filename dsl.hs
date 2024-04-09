@@ -6,6 +6,7 @@ code anything, or to input the dlx format per hand.
 
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 import Dlx
 import DlxFormat ( getSymbolicFormat, getItems, interpret, interpretConnectedInputs)
@@ -98,6 +99,8 @@ customCons = [6]
 --connected inputs (fillomino) Constraint
 connectedInputs :: [Int]
 connectedInputs = [7]
+
+
 
 condsSymbolic :: [(Int, String)]
 condsSymbolic = [(1, "x inputs per row"), (2,"x inputs per column"), (3, "x inputs in the top left to bottom right diagonal"),
